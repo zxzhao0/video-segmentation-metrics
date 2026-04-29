@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频分割指标敏感度分析台</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f5f7fa; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
+        .controls { display: flex; gap: 20px; justify-content: center; margin-bottom: 20px; }
+        select { padding: 10px; font-size: 16px; border: 1px solid #dcdfe6; border-radius: 6px; outline: none; cursor: pointer; }
+        #chart { width: 100%; height: 500px; margin-bottom: 20px; }
+        .insight-box { background: #f0f9eb; border-left: 5px solid #67c23a; padding: 15px 20px; border-radius: 4px; font-size: 15px; line-height: 1.6; color: #409eff; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>视频分割指标敏感度模拟实验台</h1>
+    <div class="controls">
+        <select id="profileSelect"></select>
+        <select id="actionSelect"></select>
+    </div>
+    <div id="chart"></div>
+    <div class="insight-box" id="insightText">请选择上方参数以查看指标洞察。</div>
+</div>
+
+<script>
+    const chart = echarts.init(document.getElementById('chart'));
+    const profileSelect = document.getElementById('profileSelect');
+    const actionSelect = document.getElementById('actionSelect');
+    const insightText = document.getElementById('insightText');
+
+    // 配置需要加载的配置文件
+    const profilesConfig = {
+        "10L_10S": { name: "均衡型 (10L_10S)", file: "monte_carlo_metrics_10L_10S.json" },
+        "15L_5S": { name: "长叙事型 (15L_5S)", file: "monte_carlo_metrics_15L_5S.json" },
+        "5L_15S": { name: "高频碎切型 (5L_15S)", file: "monte_carlo_metrics_5L_15S.json" }
+    };
+
+    let db = {};
+
+    // 动态加载所有 JSON 数据
+    async function loadData() {
+        insightText.innerHTML = "正在加载数据，请稍候...";
+        try {
+            for (const [key, config] of Object.entries(profilesConfig)) {
+                const response = await fetch(config.file);
+                if (response.ok) {
+                    const jsonData = await response.json();
+                    
+                    // 将 JSON 数据转换为内部 db 格式
+                    db[key] = {
+                        name: config.name,
+                        actions: {}
+                    };
+                    
+                    for (const [actionKey, actionData] of Object.entries(jsonData)) {
+                        db[key].actions[actionKey] = {
+                            name: `${actionData.action_name} ${actionData.target_type}`,
+                            data: {
+                                "Seg-F1": actionData.metrics["Seg-F1"],
+                                "B-F1": actionData.metrics["B-F1"],
+                                "DW-F1": actionData.metrics["DW-F1"],
+                                "AvgTIoU": actionData.metrics["Avg.TIoU"]
+                            },
+                            // 根据 action 动态生成一点提示（如果有的话可以自定义）
+                            insight: `当前查看：${config.name} 下的 ${actionData.action_name} ${actionData.target_type} 敏感度曲线。`
+                        };
+                    }
+                } else {
+                    console.warn(`无法加载 ${config.file}`);
+                }
+            }
+            
+            if (Object.keys(db).length === 0) {
+                insightText.innerHTML = "<strong>错误：未能加载任何 JSON 数据。请确保在本地服务器环境下运行（如 Live Server）以避免 CORS 拦截。</strong>";
+                return;
+            }
+
+            initUI();
+        } catch (error) {
+            insightText.innerHTML = `<strong>加载出错：${error.message}</strong>`;
+        }
+    }
+
+    function initUI() {
+        profileSelect.innerHTML = '';
+        for (let p in db) {
+            profileSelect.add(new Option(db[p].name, p));
+        }
+        
+        profileSelect.addEventListener('change', updateActions);
+        actionSelect.addEventListener('change', renderChart);
+        window.addEventListener('resize', () => chart.resize());
+        
+        updateActions(); // 首次加载
+    }
+
+    function updateActions() {
+        actionSelect.innerHTML = '';
+        const actions = db[profileSelect.value].actions;
+        for (let a in actions) {
+            actionSelect.add(new Option(actions[a].name, a));
+        }
+        renderChart();
+    }
+
+    function renderChart() {
+        const p = profileSelect.value;
+        const a = actionSelect.value;
+        const caseData = db[p].actions[a];
+        insightText.innerHTML = `<strong>${caseData.insight}</strong>`;
+
+        const option = {
+            tooltip: { trigger: 'axis' },
+            legend: { data: ['Seg-F1', 'B-F1', 'DW-F1 (Ours)', 'Avg. TIoU (Ours)'], bottom: 0 },
+            grid: { left: '5%', right: '5%', top: '10%', bottom: '15%' },
+            xAxis: { type: 'category', name: '错误数量 N', data: [1,2,3,4,5,6,7,8,9,10] },
+            yAxis: { type: 'value', name: '分数 (%)', min: 0, max: 105 },
+            series: [
+                { name: 'Seg-F1', type: 'line', data: caseData.data["Seg-F1"], lineStyle: { type: 'dashed', color: '#2ca02c' }, itemStyle: { color: '#2ca02c' } },
+                { name: 'B-F1', type: 'line', data: caseData.data["B-F1"], lineStyle: { type: 'dashed', color: '#7f7f7f' }, itemStyle: { color: '#7f7f7f' } },
+                { name: 'DW-F1 (Ours)', type: 'line', data: caseData.data["DW-F1"], lineStyle: { width: 3, color: '#d62728' }, itemStyle: { color: '#d62728' } },
+                { name: 'Avg. TIoU (Ours)', type: 'line', data: caseData.data["AvgTIoU"], lineStyle: { width: 3, color: '#1f77b4' }, itemStyle: { color: '#1f77b4' } }
+            ]
+        };
+        chart.setOption(option);
+    }
+
+    // 启动加载
+    loadData();
+</script>
+</body>
+</html>
