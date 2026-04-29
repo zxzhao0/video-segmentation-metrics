@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>复合评估体系 - 阈值决策分析</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 定制滑动条的现代外观 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 2px solid #3b82f6; /* Tailwind Blue 500 */
+            cursor: pointer;
+            margin-top: -8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #e5e7eb; /* Tailwind Gray 200 */
+            border-radius: 9999px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+        /* 添加渐变背景和卡片阴影 */
+        body {
+            background-color: #f3f4f6;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-10 px-4 font-sans text-gray-800 flex justify-center items-start">
+
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-4xl p-8 relative overflow-hidden">
+        
+        <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+
+        <div class="text-center mb-10 mt-2">
+            <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">
+                视频分割复合指标体系 <span class="text-blue-600">阈值决策台</span>
+            </h1>
+            <p class="text-gray-500 text-sm">基于 160 组蒙特卡洛仿真数据，实时评估核心指标阈值对不同视频画像的影响。</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="col-span-1 lg:col-span-1 space-y-8 bg-gray-50 p-6 rounded-xl border border-gray-100">
+                
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                            DW-F1
+                            <span class="text-xs font-normal text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">核心剧情</span>
+                        </label>
+                        <span class="text-xl font-bold text-blue-600" id="dwVal">90%</span>
+                    </div>
+                    <input type="range" id="dwSlider" min="50" max="100" value="90" class="w-full transition-all">
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                            Avg. TIoU
+                            <span class="text-xs font-normal text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">结构纯净</span>
+                        </label>
+                        <span class="text-xl font-bold text-indigo-600" id="tiouVal">85%</span>
+                    </div>
+                    <input type="range" id="tiouSlider" min="50" max="100" value="85" class="w-full">
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="text-sm font-semibold text-gray-700 flex items-center gap-1">
+                            B-F1
+                            <span class="text-xs font-normal text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">边界精度</span>
+                        </label>
+                        <span class="text-xl font-bold text-purple-600" id="bf1Val">75%</span>
+                    </div>
+                    <input type="range" id="bf1Slider" min="50" max="100" value="75" class="w-full">
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">仿真数据总览</p>
+                    <div class="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                        <div>
+                            <p class="text-sm text-gray-500">当前合格数量</p>
+                            <p class="text-3xl font-black text-gray-800"><span id="passCount" class="text-emerald-500">0</span> <span class="text-sm text-gray-400 font-normal">/ <span id="totalCountDisplay">0</span></span></p>
+                        </div>
+                        <div class="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="col-span-1 lg:col-span-2 flex flex-col h-full">
+                <div id="chart" class="w-full h-72"></div>
+                
+                <div class="mt-auto pt-6">
+                    <div class="bg-blue-50/50 rounded-xl p-5 border border-blue-100 relative">
+                        <div class="absolute -top-3 -left-3 bg-blue-100 rounded-full p-2 border border-white shadow-sm">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <h3 class="text-sm font-bold text-blue-800 mb-2 ml-4">学术评估 (Insight)</h3>
+                        <p id="adviceText" class="text-sm text-blue-900/80 ml-4 leading-relaxed"></p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+<script>
+    const profilesConfig = {
+        "均衡型\n(10L_10S)": "monte_carlo_metrics_10L_10S.json",
+        "长叙事\n(15L_5S)": "monte_carlo_metrics_15L_5S.json",
+        "碎切型\n(5L_15S)": "monte_carlo_metrics_5L_15S.json"
+    };
+
+    let realData = [];
+    let totalScenarios = 0;
+    let scenariosPerProfile = 0;
+
+    const chart = echarts.init(document.getElementById('chart'));
+    const dwSlider = document.getElementById('dwSlider');
+    const tiouSlider = document.getElementById('tiouSlider');
+    const bf1Slider = document.getElementById('bf1Slider');
+
+    async function loadData() {
+        document.getElementById('adviceText').innerHTML = "正在加载真实测试数据，请稍候...";
+        try {
+            for (const [profileName, file] of Object.entries(profilesConfig)) {
+                const response = await fetch(file);
+                if (response.ok) {
+                    const jsonData = await response.json();
+                    
+                    // 遍历每个测试动作 (drop_long, shift_short 等)
+                    for (const actionKey in jsonData) {
+                        const actionData = jsonData[actionKey];
+                        const nArray = actionData.N;
+                        
+                        // 遍历 N=1 到 N=10 的每个数据点
+                        for (let i = 0; i < nArray.length; i++) {
+                            realData.push({
+                                profile: profileName,
+                                dw: actionData.metrics["DW-F1"][i],
+                                tiou: actionData.metrics["Avg.TIoU"][i],
+                                bf1: actionData.metrics["B-F1"][i]
+                            });
+                        }
+                    }
+                } else {
+                    console.warn(`无法加载 ${file}`);
+                }
+            }
+            
+            totalScenarios = realData.length;
+            if (totalScenarios === 0) {
+                document.getElementById('adviceText').innerHTML = "<strong>错误：未能加载任何 JSON 数据。请确保在本地服务器环境下运行（如 Live Server）。</strong>";
+                return;
+            }
+
+            scenariosPerProfile = totalScenarios / Object.keys(profilesConfig).length;
+            document.getElementById('totalCountDisplay').innerText = totalScenarios;
+            
+            // 绑定事件并初始化计算
+            [dwSlider, tiouSlider, bf1Slider].forEach(s => {
+                s.addEventListener('input', calculate);
+                s.dispatchEvent(new Event('input')); 
+            });
+            window.addEventListener('resize', () => chart.resize());
+            calculate(); 
+            
+        } catch (error) {
+            document.getElementById('adviceText').innerHTML = `<strong>加载出错：${error.message}</strong>`;
+        }
+    }
+
+    // 为滑块添加拖动时的动态着色效果
+    function updateSliderTrack(slider, color) {
+        const value = (slider.value - slider.min) / (slider.max - slider.min) * 100;
+        slider.style.background = `linear-gradient(to right, ${color} 0%, ${color} ${value}%, #e5e7eb ${value}%, #e5e7eb 100%)`;
+    }
+
+    function calculate() {
+        if (realData.length === 0) return;
+        
+        const dwThr = parseFloat(dwSlider.value);
+        const tiouThr = parseFloat(tiouSlider.value);
+        const bf1Thr = parseFloat(bf1Slider.value);
+        
+        document.getElementById('dwVal').innerText = dwThr + '%';
+        document.getElementById('tiouVal').innerText = tiouThr + '%';
+        document.getElementById('bf1Val').innerText = bf1Thr + '%';
+
+        updateSliderTrack(dwSlider, '#2563eb'); // blue-600
+        updateSliderTrack(tiouSlider, '#4f46e5'); // indigo-600
+        updateSliderTrack(bf1Slider, '#9333ea'); // purple-600
+
+        let passCounts = { "均衡型\n(10L_10S)": 0, "长叙事\n(15L_5S)": 0, "碎切型\n(5L_15S)": 0 };
+        let totalPass = 0;
+
+        realData.forEach(item => {
+            if (item.dw >= dwThr && item.tiou >= tiouThr && item.bf1 >= bf1Thr) {
+                passCounts[item.profile]++;
+                totalPass++;
+            }
+        });
+
+        // 数字滚动动画效果
+        const countEl = document.getElementById('passCount');
+        countEl.innerText = totalPass;
+        countEl.classList.remove('scale-110');
+        void countEl.offsetWidth; // trigger reflow
+        countEl.classList.add('scale-110', 'transition-transform');
+
+        updateChart(passCounts);
+        updateAdvice(dwThr, tiouThr, bf1Thr, totalPass);
+    }
+
+    function updateChart(passCounts) {
+        const option = {
+            tooltip: { 
+                trigger: 'axis', 
+                formatter: `{b} <br/> 可用场景: <b>{c}</b> / ${scenariosPerProfile}`,
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                borderColor: '#e5e7eb',
+                textStyle: { color: '#374151' },
+                padding: [10, 15]
+            },
+            grid: { left: '3%', right: '3%', bottom: '5%', top: '15%', containLabel: true },
+            xAxis: { 
+                type: 'category', 
+                data: Object.keys(passCounts),
+                axisLine: { lineStyle: { color: '#d1d5db' } },
+                axisLabel: { color: '#6b7280', fontSize: 12, fontWeight: 500, margin: 12 },
+                axisTick: { show: false }
+            },
+            yAxis: { 
+                type: 'value', 
+                max: scenariosPerProfile,
+                splitLine: { lineStyle: { type: 'dashed', color: '#f3f4f6' } },
+                axisLabel: { show: false }
+            },
+            series: [{
+                data: Object.values(passCounts),
+                type: 'bar',
+                barWidth: '45%',
+                itemStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: '#3b82f6' }, // top blue
+                        { offset: 1, color: '#818cf8' }  // bottom light indigo
+                    ]),
+                    borderRadius: [6, 6, 0, 0],
+                    shadowColor: 'rgba(59, 130, 246, 0.3)',
+                    shadowBlur: 10,
+                    shadowOffsetY: 5
+                },
+                label: { 
+                    show: true, 
+                    position: 'top', 
+                    formatter: '{c}',
+                    color: '#4b5563',
+                    fontSize: 14,
+                    fontWeight: 'bold'
+                },
+                animationDuration: 800,
+                animationEasing: 'cubicOut'
+            }]
+        };
+        chart.setOption(option);
+    }
+
+    function updateAdvice(dw, tiou, bf1, pass) {
+        let text = "";
+        let colorClass = "text-blue-900/80";
+        let bgClass = "bg-blue-50/50";
+        let borderClass = "border-blue-100";
+        let iconHtml = `<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+
+        if (pass === 0) {
+            text = "标准过于严苛。您设定的阈值超出了算法在复杂真实世界中的物理极限，这可能会误杀大量在主观体验上完全可用的优质模型。";
+            colorClass = "text-amber-900/80"; bgClass = "bg-amber-50/50"; borderClass = "border-amber-100";
+            iconHtml = `<svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
+        }
+        else if (dw < 85) {
+            text = "DW-F1 阈值偏低。此时长叙事视频中的核心剧情即便被大量撕裂或错误粘连，模型依然能过关。这会导致强烈的负面主观体验。";
+            colorClass = "text-red-900/80"; bgClass = "bg-red-50/50"; borderClass = "border-red-100";
+        }
+        else if (tiou < 80) {
+            text = "Avg. TIoU 阈值存在漏洞。由于 DW-F1 包容度较高，较低的 TIoU 会允许模型通过“少切（欠分割）”策略作弊，掩盖局部边界不清的缺陷。";
+            colorClass = "text-red-900/80"; bgClass = "bg-red-50/50"; borderClass = "border-red-100";
+        }
+        else if (dw >= 90 && tiou >= 85 && bf1 >= 75) {
+            text = "<b>完美的学术可用基准线 (A级)</b>。该组合成功拦截了灾难性的长剧情撕裂，封堵了欠分割作弊漏洞，同时为人类可容忍的秒级误差（如短视频偏移）留出了合理的科学空间。";
+            colorClass = "text-emerald-900/80"; bgClass = "bg-emerald-50/50"; borderClass = "border-emerald-100";
+            iconHtml = `<svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+        }
+        else {
+            text = "标准处于中等宽容状态。这一配置更适用于对帧级精度要求不高的粗粒度内容推荐（如长视频章节索引），但不建议作为 SOTA 模型的评估金标准。";
+        }
+        
+        const adviceContainer = document.getElementById('adviceText').parentElement;
+        adviceContainer.className = `${bgClass} rounded-xl p-5 border ${borderClass} relative transition-colors duration-300`;
+        adviceContainer.querySelector('div').className = `absolute -top-3 -left-3 ${bgClass.replace('/50', '')} rounded-full p-2 border border-white shadow-sm`;
+        adviceContainer.querySelector('div').innerHTML = iconHtml;
+        document.getElementById('adviceText').className = `text-sm ${colorClass} ml-4 leading-relaxed transition-colors duration-300`;
+        document.getElementById('adviceText').innerHTML = text;
+    }
+
+    // 启动加载
+    loadData();
+</script>
+</body>
+</html>
