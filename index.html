@@ -116,15 +116,15 @@
 
         const option = {
             tooltip: { trigger: 'axis' },
-            legend: { data: ['Seg-F1', 'B-F1', 'DW-F1 (Ours)', 'Avg. TIoU (Ours)'], bottom: 0 },
+            legend: { data: ['Seg-F1', 'B-F1', 'DW-F1', 'Avg. TIoU'], bottom: 0 },
             grid: { left: '5%', right: '5%', top: '10%', bottom: '15%' },
             xAxis: { type: 'category', name: '错误数量 N', data: [1,2,3,4,5,6,7,8,9,10] },
             yAxis: { type: 'value', name: '分数 (%)', min: 0, max: 105 },
             series: [
                 { name: 'Seg-F1', type: 'line', data: caseData.data["Seg-F1"], lineStyle: { type: 'dashed', color: '#2ca02c' }, itemStyle: { color: '#2ca02c' } },
                 { name: 'B-F1', type: 'line', data: caseData.data["B-F1"], lineStyle: { type: 'dashed', color: '#7f7f7f' }, itemStyle: { color: '#7f7f7f' } },
-                { name: 'DW-F1 (Ours)', type: 'line', data: caseData.data["DW-F1"], lineStyle: { width: 3, color: '#d62728' }, itemStyle: { color: '#d62728' } },
-                { name: 'Avg. TIoU (Ours)', type: 'line', data: caseData.data["AvgTIoU"], lineStyle: { width: 3, color: '#1f77b4' }, itemStyle: { color: '#1f77b4' } }
+                { name: 'DW-F1', type: 'line', data: caseData.data["DW-F1"], lineStyle: { width: 3, color: '#d62728' }, itemStyle: { color: '#d62728' } },
+                { name: 'Avg. TIoU', type: 'line', data: caseData.data["AvgTIoU"], lineStyle: { width: 3, color: '#1f77b4' }, itemStyle: { color: '#1f77b4' } }
             ]
         };
         chart.setOption(option);
